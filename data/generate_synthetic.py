@@ -1,11 +1,11 @@
-"""Generate a seeded batch of synthetic subscription failure events.
+﻿"""Generate a seeded batch of synthetic subscription failure events.
 
 Run:
     python -m data.generate_synthetic
 
 Writes rows to `failure_events` and a holdout manifest to
 data/holdout_ids.json (20% of event IDs, untouched by prompt tuning
-per spec section 9 — don't read this file until final evaluation).
+per spec section 9 â€” don't read this file until final evaluation).
 
 Deterministic: same RANDOM_SEED always produces the same batch, which is
 what lets you rehearse the demo and get the same numbers every time.
@@ -41,7 +41,7 @@ FAILURE_TYPE_WEIGHTS = {
     "gateway_timeout": 0.15,
 }
 
-# Indian subscription price points (INR) — mix of low, mid, high tier plans.
+# Indian subscription price points (INR) â€” mix of low, mid, high tier plans.
 AMOUNT_CHOICES = [199, 299, 499, 999, 1499, 2999, 4999, 7999]
 
 
@@ -76,6 +76,7 @@ def generate_events(n: int, seed: int):
                 status="open",
             )
         )
+    return events
 
 def main():
     print(f"Generating {NUM_EVENTS} synthetic failure events (seed={SEED})...")
@@ -117,3 +118,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
