@@ -103,3 +103,51 @@ reintroduces a non-deterministic field on `FailureEvent` would reappear as
 a mismatch on this same two-run comparison.
 
 ---
+### Entry 4
+
+**Problem:** The full-batch pipeline run crashed partway through (49/80
+events processed) with `groq.BadRequestError: Tool choice is required,
+but model did not call a tool`. The retry wrapper (3 attempts, exponential
+backoff) added specifically to handle transient structured-output
+failures did not help -- all 3 retries failed identically.
+
+**Why it happened:** The failure was specific to `gateway_timeout` events.
+Per `app/diagnosis.py`'s `STRATEGY_MENU`, `gateway_timeout` maps to exactly
+ONE eligible strategy (`immediate_retry`). The model, faced with a
+"choice" that isn't really a choice, sometimes answered in free-text
+markdown ("**Strategy:** immediate_retry... **Reasoning:** ...") instead
+of making the required structured tool call. Since `strategy_agent`'s LLM
+client runs at `temperature=0.0` for reproducibility, this failure is
+fully deterministic given the same prompt -- so retrying the identical
+prompt 3 times produced the identical failure 3 times. The retry wrapper
+is genuinely useful for truly transient failures (rate limits, timeouts,
+occasional non-deterministic tool-call misses), but this particular
+failure mode is systematic, not transient, so no amount of retrying the
+same input would have fixed it.
+
+**How it was detected:** A full 80-event batch run crashed at event
+49/80. The error's `failed_generation` field showed the model's actual
+(non-tool-call) text response, which made the root cause visible
+immediately rather than requiring further digging.
+
+**Fix:** `strategy_agent_node` (`app/graph.py`) now short-circuits when
+`diagnosis` returns exactly one eligible strategy: it selects that
+strategy directly with `confidence=1.0` and logs the decision, without
+calling the LLM at all. This mirrors the existing zero-eligible-strategies
+branch (which also skips the LLM call) and is the philosophically correct
+fix, not just a workaround -- if there's no real judgment call to make,
+there's nothing for the model's judgment to add. As a side effect, this
+also cuts total Groq API calls by roughly 40%, since `expired_card`
+(1 eligible strategy: `send_update_card_link`) and `gateway_timeout`
+(1 eligible strategy: `immediate_retry`) together account for a large
+share of the synthetic batch.
+
+**How regression was prevented:** Added a test with a mocked LLM client
+that raises if called at all; asserts the LLM's `invoke.call_count == 0`
+for a `gateway_timeout` event, and that `immediate_retry` is still
+selected with `confidence=1.0` purely from the single-eligible-strategy
+short-circuit. If a future change accidentally routes single-option cases
+through the LLM again, this test fails immediately rather than only
+surfacing intermittently on a full batch run.
+
+---
