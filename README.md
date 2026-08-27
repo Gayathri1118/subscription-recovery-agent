@@ -1,20 +1,34 @@
 # Subscription Revenue Recovery Agent
 
-Razorpay Buildathon — Track 03: AI Revenue Recovery
+A personal project exploring AI-driven recovery of failed subscription
+payments for Indian markets — built to go deep on two things most
+recovery tools skip: code-mixed Indian-language negotiation and a
+deterministic safety layer that gates every automated action.
+
+## Why this project
+
+Most payment-recovery tooling either retries blindly or assumes customers
+reply in plain English. Neither holds up in the Indian subscription market,
+where customer replies routinely mix English with Hindi, Tamil, Telugu,
+Kannada, or Malayalam, and where trusting an LLM to act on its own on a
+real customer's payment method is not something any serious system should
+do without a hard, auditable check first. This project builds both: an
+agent that can actually understand a "kal tak pay kar dunga" reply, and a
+policy/safety layer that keeps every LLM decision inside deterministic
+guardrails before it touches anything.
 
 ## What it solves
 
 Recovers failed subscription payments by diagnosing the cause, negotiating
-in Hinglish, and tracking promises to pay — with every action gated by a
-deterministic safety policy before anything executes.
+in code-mixed Indian languages, and tracking promises to pay — with every
+action gated by a deterministic safety policy before anything executes.
 
 ## AI judgment, stated explicitly
 
 The LLM is used **only** where language understanding is genuinely needed:
 diagnosing customer intent and extracting a promise date from a customer
 reply. Everything else — policy checks, safety gating, stopping rules — is
-deterministic code. See `app/policy.py` / `app/safety.py` (Policy & Safety phase) for the
-rules.
+deterministic code. See `app/policy.py` / `app/safety.py` for the rules.
 
 ### Language coverage
 
@@ -50,7 +64,7 @@ Synthetic failure event
 ALLOWED   BLOCKED/ESCALATE → audit event, human review queue
    │
    ▼
-EXECUTOR (mock payment provider) → sends Hinglish message / retries
+EXECUTOR (mock payment provider) → sends language-appropriate message / retries
    │
    ▼
 PROMISE-TO-PAY NODE (LLM)        → extracts commitment date
@@ -64,7 +78,7 @@ what-broke evidence in one table.
 
 ## Status
 
-Currently on **LLM Integration phase** (Foundation and Policy & Safety phases complete — see full roadmap in the project spec).
+Currently on **LLM Integration phase** (Foundation and Policy & Safety phases complete).
 
 - [x] Repo init, Postgres schema, FastAPI scaffold
 - [x] Synthetic data generator (seeded, 80 events + 5-language reply bank:
@@ -72,8 +86,8 @@ Currently on **LLM Integration phase** (Foundation and Policy & Safety phases co
 - [x] Mock payment provider
 - [x] Baseline (blind-retry) function, metrics logged
 - [x] Detector + Diagnosis + Policy + Safety (Policy & Safety phase), wired into LangGraph
-- [ ] LLM integration — Groq / Llama 3.3 70B (LLM Integration phase)
-- [ ] Full batch + evaluation + demo scenario (Evaluation phase)
+- [ ] LLM integration — Groq / `openai/gpt-oss-120b` (LLM Integration phase)
+- [ ] Full batch evaluation + demo scenario (Evaluation phase)
 - [ ] Polish, docs, video (Submission phase)
 
 ## How to run
@@ -107,7 +121,7 @@ python -m data.generate_synthetic
 
 Writes 80 seeded failure events to Postgres and a holdout manifest to
 `data/holdout_ids.json` (20% of IDs, don't tune prompts against these —
-spec section 9).
+keep them clean for final evaluation).
 
 ### 4. Run the baseline
 
@@ -116,7 +130,7 @@ python -m baseline.blind_retry
 ```
 
 Prints the baseline recovery rate — this is the number the real agent has
-to beat in the final comparison (spec section 10).
+to beat in the final comparison.
 
 ### 5. Start the API
 
@@ -152,13 +166,11 @@ LLM call's output.
 
 ## Data model
 
-See `app/schema.sql` for the source of truth. One deliberate deviation
-from the original spec: `recovery_outcomes` has a composite primary key
+See `app/schema.sql` for the source of truth. One deliberate design choice: `recovery_outcomes` has a composite primary key
 `(failure_event_id, strategy)` rather than just `failure_event_id`, so the
 same event can carry both a `baseline_blind_retry` row and an agent-strategy
-row for the section-10 side-by-side comparison.
+row for a direct side-by-side comparison.
 
 ## Failure recovery log
 
-See [`docs/what-broke.md`](docs/what-broke.md) — started hour 1, real bugs
-only.
+See [`docs/what-broke.md`](docs/what-broke.md) — kept from day one of the build, real bugs only.
