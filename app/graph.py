@@ -243,6 +243,7 @@ def executor_node(state: RecoveryState) -> RecoveryState:
         attempt_number=event.attempt_number,
         already_recovered=(event.status == "recovered"),
         is_duplicate=False,
+        strategy=strategy,
     )
     recovery_status = "recovered" if outcome == "SUCCESS" else "failed"
     recovered_amount = float(event.amount) if outcome == "SUCCESS" else None
@@ -371,4 +372,5 @@ def run_event(db: Session, event: FailureEvent) -> RecoveryState:
     """
     initial_state: RecoveryState = {"db": db, "event": event}
     return app_graph.invoke(initial_state)
+
 

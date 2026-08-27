@@ -151,3 +151,61 @@ through the LLM again, this test fails immediately rather than only
 surfacing intermittently on a full batch run.
 
 ---
+### Entry 5
+
+**Problem:** `python -m scripts.compare_recovery` showed the agent
+recovering meaningfully LESS than the baseline (e.g. -11.2 percentage
+points on one real run), which is the opposite of this project's core
+premise -- a smarter, diagnosis-driven agent should outperform a blind
+retry, not lose to it.
+
+**Why it happened:** `mock_provider/provider.py`'s `mock_execute()`
+computed its outcome purely from `hash(seed, event_id, attempt_number)` --
+never from which strategy was chosen. Since `app/graph.py`'s
+`executor_node` called `mock_execute()` with the SAME `(event_id,
+attempt_number)` the baseline used for that same event, five of the six
+agent strategies (`retry_same_card`, `request_alt_payment_method`,
+`delayed_retry`, `immediate_retry`, `send_update_card_link`) produced
+EXACTLY the same outcome as baseline, regardless of which one the LLM
+picked. The agent's only possible source of genuine uplift was
+`negotiate_promise_to_pay`'s separately-simulated commitment path; every
+other "smarter" strategy choice was mechanically a no-op. Meanwhile the
+safety gate correctly declines to auto-act on some events (amount over
+limit, too many retries) that baseline blindly attempts and sometimes
+wins on by chance -- pure downside with no offsetting uplift mechanism
+for the other five strategies. Net effect: the agent structurally could
+not beat baseline except via negotiation, no matter how good its strategy
+selection was.
+
+**How it was detected:** Built `scripts/compare_recovery.py` specifically
+to produce the agent-vs-baseline number for the project's central claim.
+The result contradicted the premise, which prompted tracing where a
+"better" strategy could possibly change the simulated outcome -- leading
+straight to `mock_execute()`'s signature.
+
+**Fix:** `mock_execute()` gained an optional `strategy` parameter.
+`baseline/blind_retry.py`'s call site is UNCHANGED (never passes
+`strategy`), so baseline's hash and thresholds -- and therefore its
+already-documented recovery numbers -- are byte-identical to before this
+fix. `app/graph.py`'s `executor_node` now passes `strategy` through.
+`retry_same_card` and `immediate_retry` deliberately still fall through to
+the same thresholds and the same roll baseline uses, since they're
+mechanically the identical action (same card, same immediate attempt) --
+no artificial advantage where none is earned. The other three
+(`request_alt_payment_method`, `delayed_retry`, `send_update_card_link`)
+now get their own outcome profile (0.75 / 0.65 / 0.70 success
+respectively, vs. baseline's 0.55) and an independent roll, reflecting
+that they're genuinely different actions with a real-world reason to
+succeed more often.
+
+**How regression was prevented:** Reran baseline on both seed 42 and seed
+7 after the fix and confirmed byte-identical recovered amounts and rates
+to the pre-fix, already-documented numbers. Directly verified (with a
+mocked `mock_execute`) that `executor_node` passes the chosen strategy
+through in its call. Sampled each strategy's outcome 3,000 times and
+confirmed convergence to its intended success probability. Any future
+change that breaks baseline's call site into passing `strategy`
+accidentally would immediately show up as a baseline-number mismatch on
+this same two-seed comparison.
+
+---
