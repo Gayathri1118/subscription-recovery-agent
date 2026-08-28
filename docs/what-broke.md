@@ -205,7 +205,59 @@ mocked `mock_execute`) that `executor_node` passes the chosen strategy
 through in its call. Sampled each strategy's outcome 3,000 times and
 confirmed convergence to its intended success probability. Any future
 change that breaks baseline's call site into passing `strategy`
-accidentally would immediately show up as a baseline-number mismatch on
+accidentally would im mediately show up as a baseline-number mismatch on
 this same two-seed comparison.
 
 ---
+### Entry 6
+
+**Problem:** `python -m scripts.compare_recovery` on the real, final seed-7
+run showed the agent recovering LESS than baseline (37.5% vs. 51.2%, a
+-13.7 point gap) — even after Entry 5's fix removed the mechanical bug
+that made most strategies no-ops. This time the gap is real, not a bug,
+so it needed a different kind of investigation: not "what's broken" but
+"is this number actually wrong."
+
+**Why it happened:** Broken into its two real components instead of
+treated as one mystery number. First, the safety gate declined 10 of 80
+events baseline blindly attempted and partly won on by chance — pure
+downside for the agent with no offsetting mechanism, by design (the gate
+is meant to say no to genuinely risky auto-actions). Second, and larger:
+the LLM chose `negotiate_promise_to_pay` 12 times this run, but only 4 of
+those 12 conversations resolved to a `clear_promise` intent, and only 2 of
+those 4 were kept (Evaluation phase's stated 70% assumption, small-sample
+variance). Negotiate's effective recovery rate this batch is therefore
+~2/12 ≈ 17%, well under `delayed_retry`'s unconditional 65% baked into the
+mock provider for the same `insufficient_funds` cause. The LLM Integration
+phase prompt deliberately nudges negotiate to fire on repeat
+`insufficient_funds` failures specifically so the multi-language
+conversation path gets exercised in the batch — that's a real design
+tradeoff (demonstrate the code-mixed language capability vs. maximize
+same-day recovery rate), not an error anywhere in the pipeline.
+
+**How it was detected:** The three-part `compare_recovery.py` output
+(added specifically to avoid a misleading single headline number) made
+this legible instead of hidden: strategy-selection-only uplift (42.9%
+agent vs. 50.0% baseline on the 70 events the agent actually attempted,
+safety declines excluded from both sides) isolated that the LLM's choice
+itself is the primary driver, not the safety gate. Cross-checking against
+the raw pipeline log's per-event strategy assignments confirmed the
+12-events-chosen / 4-commitments-created ratio directly.
+
+**Fix:** None applied — this is not a bug. Documenting it here instead of
+silently re-tuning the prompt to force a "beat baseline" number, since
+that would trade an honest, explainable tradeoff for a number that looks
+better but hides why. The negotiation-only revenue section of
+`compare_recovery.py`'s output (₹6,498 across 2 kept commitments) is the
+correct way to show this path's value: money baseline structurally cannot
+reach by construction, reported separately rather than blended into a
+rate comparison it will always lose on small samples.
+
+**How regression was prevented:** Not applicable — nothing to regress
+against. If a future prompt or strategy-menu change is made specifically
+to inflate negotiate's usage rate for the sake of the headline number, the
+strategy-selection-uplift section of `compare_recovery.py` will keep
+showing that tradeoff plainly, since it isolates strategy choice from
+every other variable.
+
+--- 

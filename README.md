@@ -78,17 +78,53 @@ what-broke evidence in one table.
 
 ## Status
 
-Currently on **LLM Integration phase** (Foundation and Policy & Safety phases complete).
+All phases complete: Foundation, Policy & Safety, LLM Integration, Evaluation.
 
 - [x] Repo init, Postgres schema, FastAPI scaffold
 - [x] Synthetic data generator (seeded, 80 events + 5-language reply bank:
       Hindi, Tamil, Telugu, Kannada, Malayalam code-mixed)
 - [x] Mock payment provider
 - [x] Baseline (blind-retry) function, metrics logged
-- [x] Detector + Diagnosis + Policy + Safety (Policy & Safety phase), wired into LangGraph
-- [ ] LLM integration — Groq / `openai/gpt-oss-120b` (LLM Integration phase)
-- [ ] Full batch evaluation + demo scenario (Evaluation phase)
-- [ ] Polish, docs, video (Submission phase)
+- [x] Detector + Diagnosis + Policy + Safety, wired into LangGraph
+- [x] LLM integration — Groq / `openai/gpt-oss-120b`, 7-node LangGraph pipeline
+- [x] Full batch evaluation + promise-to-pay resolution
+- [ ] Demo script + terminal recording, CI badge (polish)
+
+## Evaluation results
+
+Seed 7, 80 synthetic failure events, same denominator for both arms.
+
+| | Baseline (blind retry) | Agent |
+|---|---|---|
+| Recovered (count) | 41 | 30 |
+| Recovery rate | 51.2% | 37.5% |
+| Amount recovered | ₹101,459 | ₹53,770 |
+
+The agent recovers less than baseline on the headline number. That's a
+real, investigated result, not a bug — see
+[`docs/what-broke.md`, Entry 6](docs/what-broke.md) for the full
+breakdown. Two things drive the gap:
+
+1. **The safety gate.** 10 of 80 events were declined outright (amount
+   over limit, retry count exceeded) — baseline blindly attempts these
+   and sometimes wins by chance; the agent correctly refuses to.
+2. **Negotiation's low immediate-conversion rate.** The LLM chose
+   `negotiate_promise_to_pay` 12 times; only 4 of those conversations
+   produced a commitment, and only 2 were kept — an effective ~17% hit
+   rate, well under `delayed_retry`'s 65% for the same failure cause.
+   The prompt deliberately favors negotiation on repeat
+   `insufficient_funds` failures so the multi-language conversation path
+   actually gets exercised in the batch, trading same-day recovery rate
+   for demonstrating the code-mixed-language capability.
+
+Isolating strategy choice from the safety gate (same 70 events the agent
+actually attempted) still shows a gap — 42.9% vs. 50.0% — confirming
+negotiation's conversion rate, not the safety gate, is the primary driver.
+
+Negotiation also recovers revenue baseline structurally cannot reach by
+construction: ₹6,498 across the 2 kept commitments this run, reported
+separately here rather than blended into the rate comparison above, where
+it would just look like noise on this sample size.
 
 ## How to run
 
