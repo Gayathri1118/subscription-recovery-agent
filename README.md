@@ -1,4 +1,5 @@
 # Subscription Revenue Recovery Agent
+![CI](https://github.com/Gayathri1118/subscription-recovery-agent/actions/workflows/ci.yml/badge.svg)
 
 A personal project exploring AI-driven recovery of failed subscription
 payments for Indian markets — built to go deep on two things most
@@ -88,7 +89,10 @@ All phases complete: Foundation, Policy & Safety, LLM Integration, Evaluation.
 - [x] Detector + Diagnosis + Policy + Safety, wired into LangGraph
 - [x] LLM integration — Groq / `openai/gpt-oss-120b`, 7-node LangGraph pipeline
 - [x] Full batch evaluation + promise-to-pay resolution
-- [ ] Demo script + terminal recording, CI badge (polish)
+- [x] CI — GitHub Actions running pytest on every push
+- [x] React dashboard + demo UI (`frontend/`) for browsing events and the
+      full pipeline trace
+- [ ] Demo script / narrated walkthrough (optional polish)
 
 ## Evaluation results
 
@@ -179,7 +183,26 @@ uvicorn app.main:app --reload
 - `GET /failure-events/{id}` — one event's full audit trail + outcomes
 - `GET /metrics/{strategy}` — aggregate recovery rate for a strategy label
   (e.g. `/metrics/baseline_blind_retry`)
+- `GET /metrics/comparison` — the agent-vs-baseline 3-part comparison, as JSON
 - `POST /mock/recovery/{event_id}/execute` — mock provider endpoint
+
+## Dashboard & demo UI
+
+A React frontend (`frontend/`) provides a browsable ledger of all events
+and a full 7-node pipeline trace per event — this doubles as the project
+demo, in place of a terminal recording.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` (with the API running per step 5 above).
+The **Ledger** tab lists every event and opens into its full pipeline
+trace on click; the **Comparison** tab renders the same 3-part
+agent-vs-baseline breakdown as the Evaluation results section above,
+live from the database.
 
 ## Policy & Safety phase — deterministic pipeline (no LLM yet)
 
