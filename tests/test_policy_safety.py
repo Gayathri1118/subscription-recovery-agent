@@ -66,7 +66,7 @@ def _new_test_event(db, **kwargs):
     db.flush()
     return new_event
 
-
+@pytest.mark.requires_groq
 def test_pipeline_prefix_logged_in_order(db_session):
     """Checkpoint 1: detector -> diagnosis -> strategy_agent -> policy -> safety
     is always the prefix logged for any ALLOWED-through-safety event, in order.
