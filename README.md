@@ -100,9 +100,9 @@ Seed 7, 80 synthetic failure events, same denominator for both arms.
 
 | | Baseline (blind retry) | Agent |
 |---|---|---|
-| Recovered (count) | 41 | 30 |
-| Recovery rate | 51.2% | 37.5% |
-| Amount recovered | ₹101,459 | ₹53,770 |
+| Recovered (count) | 41 | 31 |
+| Recovery rate | 51.2% | 38.8% |
+| Amount recovered | ₹101,459 | ₹55,269 |
 
 The agent recovers less than baseline on the headline number. That's a
 real, investigated result, not a bug — see
@@ -113,8 +113,8 @@ breakdown. Two things drive the gap:
    over limit, retry count exceeded) — baseline blindly attempts these
    and sometimes wins by chance; the agent correctly refuses to.
 2. **Negotiation's low immediate-conversion rate.** The LLM chose
-   `negotiate_promise_to_pay` 12 times; only 4 of those conversations
-   produced a commitment, and only 2 were kept — an effective ~17% hit
+   `negotiate_promise_to_pay` 12 times; only 5 of those conversations
+   produced a commitment, and 3 were kept — an effective ~25% hit
    rate, well under `delayed_retry`'s 65% for the same failure cause.
    The prompt deliberately favors negotiation on repeat
    `insufficient_funds` failures so the multi-language conversation path
@@ -122,14 +122,19 @@ breakdown. Two things drive the gap:
    for demonstrating the code-mixed-language capability.
 
 Isolating strategy choice from the safety gate (same 70 events the agent
-actually attempted) still shows a gap — 42.9% vs. 50.0% — confirming
+actually attempted) still shows a gap — 44.3% vs. 50.0% — confirming
 negotiation's conversion rate, not the safety gate, is the primary driver.
 
 Negotiation also recovers revenue baseline structurally cannot reach by
-construction: ₹6,498 across the 2 kept commitments this run, reported
+construction: ₹7,997 across the 3 kept commitments this run, reported
 separately here rather than blended into the rate comparison above, where
 it would just look like noise on this sample size.
 
+Note: these figures come from the batch seeded on the live Neon database
+backing the deployed demo. A local run against the same seed can differ
+slightly run to run, since Groq's model responses aren't bit-for-bit
+reproducible even at temperature 0 — only the deterministic parts of the
+pipeline (policy, safety, mock payment outcomes) are guaranteed identical.
 ## How to run
 
 ### 1. Start Postgres

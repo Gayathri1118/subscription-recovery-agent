@@ -260,4 +260,19 @@ strategy-selection-uplift section of `compare_recovery.py` will keep
 showing that tradeoff plainly, since it isolates strategy choice from
 every other variable.
 
+
+**Addendum (re-run on Neon):** Re-running the full sequence against the
+live Neon database (same seed=7, same code) produced a close but not
+identical result: 31 recovered vs. the original 30, 5 commitments vs. 4,
+3 kept vs. 2. Headline rate moved from 37.5% to 38.8%. This is expected,
+not a new bug — `strategy_agent` and `promise_tracker` call a real LLM
+(Groq), and while the client runs at `temperature=0.0`, that only makes a
+single call deterministic *given the exact same prompt reaching the model
+the exact same way*; it does not guarantee bit-for-bit identical output
+across separate API calls on different days. The deterministic parts of
+the pipeline (policy, safety, mock payment outcomes, the 70% kept-rate
+roll) reproduced exactly as expected; only the two LLM-touched nodes
+introduced this small variance. The underlying explanation in this entry
+— negotiate's low immediate-conversion rate driving the gap — still
+holds at 38.8% just as it did at 37.5%.
 --- 
